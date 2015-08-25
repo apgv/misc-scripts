@@ -20,6 +20,12 @@ import java.time.LocalDate
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 
+/*
+Code has been based on the examples found at the following URLs
+https://developers.google.com/google-apps/calendar/quickstart/java
+https://developers.google.com/google-apps/calendar/create-events
+ */
+
 Properties properties = new Properties()
 resourceAsStream('/calendar.properties').withStream {
     properties.load(it)
@@ -51,6 +57,7 @@ resourceAsStream('/turnus.csv').splitEachLine(',') { fields ->
 }
 
 def calendarId = properties.getProperty('calendarid')
+service = getCalendarService()
 
 calendarEvents.forEach() {
     addEventToCalendar(calendarId, it.date, it.summary)
@@ -94,7 +101,7 @@ def addEventToCalendar(String calendarId, ZonedDateTime zonedDateTime, String su
             .setUseDefault(true)
     event.setReminders(reminders)
 
-    event = getCalendarService().events().insert(calendarId, event).execute()
+    event = service.events().insert(calendarId, event).execute()
     println("Event created: ${event.getHtmlLink()}")
 }
 

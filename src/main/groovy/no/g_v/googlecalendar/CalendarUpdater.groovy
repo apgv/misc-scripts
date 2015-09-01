@@ -15,10 +15,11 @@ import com.google.api.services.calendar.CalendarScopes
 import com.google.api.services.calendar.model.Event
 import com.google.api.services.calendar.model.EventDateTime
 
-import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
+
+import static java.time.DayOfWeek.*
 
 /*
 Code has been based on the examples found at the following URLs
@@ -48,7 +49,7 @@ resourceAsStream('/turnus.csv').splitEachLine(',') { fields ->
 
         calendarEvents << [date: createZonedDateTime(date, 8), summary: summary]
 
-        if (nightShifts.contains(shiftCode)) {
+        if (nightShiftOnWeekday(nightShifts, shiftCode, date)) {
             calendarEvents << [date: createZonedDateTime(date, 15), summary: eventPickupText]
         }
     } else {
@@ -64,14 +65,19 @@ calendarEvents.forEach() {
 }
 
 private boolean shiftCodeIsValidForDay(String[] workweekOnly, String[] weekendOnly, LocalDate date, String shiftCode) {
-    def weekendDays = [DayOfWeek.SATURDAY, DayOfWeek.SUNDAY]
-
-    boolean isWeekendDay = weekendDays.contains(date.dayOfWeek)
-    boolean isWorkWeekDay = !isWeekendDay
+    boolean isWeekendDay = [SATURDAY, SUNDAY].contains(date.dayOfWeek)
     boolean shiftCodeIsWeekendOnly = weekendOnly.contains(shiftCode)
     boolean shiftCodeIsWorkWeekOnly = workweekOnly.contains(shiftCode)
 
-    (isWorkWeekDay && !shiftCodeIsWeekendOnly) || (isWeekendDay && !shiftCodeIsWorkWeekOnly)
+    (isWeekDay(date) && !shiftCodeIsWeekendOnly) || (isWeekendDay && !shiftCodeIsWorkWeekOnly)
+}
+
+private boolean nightShiftOnWeekday(String[] nightShifts, String shiftCode, LocalDate date) {
+    nightShifts.contains(shiftCode) && isWeekDay(date)
+}
+
+boolean isWeekDay(LocalDate date) {
+    [MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY].contains(date.dayOfWeek)
 }
 
 private ZonedDateTime createZonedDateTime(LocalDate date, Integer startHour) {

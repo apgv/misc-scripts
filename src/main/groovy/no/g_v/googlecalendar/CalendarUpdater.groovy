@@ -82,7 +82,6 @@ boolean isWeekDay(LocalDate date) {
 
 private ZonedDateTime createZonedDateTime(LocalDate date, Integer startHour) {
     def zonedDateTime = ZonedDateTime.now()
-            .withFixedOffsetZone()
             .withYear(date.year)
             .withMonth(date.monthValue)
             .withDayOfMonth(date.dayOfMonth)
@@ -112,7 +111,7 @@ def addEventToCalendar(String calendarId, ZonedDateTime zonedDateTime, String su
 }
 
 private EventDateTime createEventDateTime(ZonedDateTime zonedDateTime) {
-    DateTime dateTime = new DateTime(zonedDateTime.toString())
+    DateTime dateTime = new DateTime(zonedDateTime.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME))
 
     EventDateTime eventDateTime = new EventDateTime()
             .setDateTime(dateTime)

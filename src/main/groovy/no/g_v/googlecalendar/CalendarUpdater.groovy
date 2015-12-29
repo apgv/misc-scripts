@@ -6,6 +6,7 @@ import com.google.api.client.extensions.jetty.auth.oauth2.LocalServerReceiver
 import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeFlow
 import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport
+import com.google.api.client.googleapis.json.GoogleJsonResponseException
 import com.google.api.client.http.HttpTransport
 import com.google.api.client.json.jackson2.JacksonFactory
 import com.google.api.client.util.DateTime
@@ -25,6 +26,7 @@ import static java.time.DayOfWeek.*
 Code has been based on the examples found at the following URLs
 https://developers.google.com/google-apps/calendar/quickstart/java
 https://developers.google.com/google-apps/calendar/create-events
+https://developers.google.com/drive/v2/web/handle-errors#implementing_exponential_backoff
  */
 
 Properties properties = new Properties()
@@ -42,7 +44,7 @@ def shifts = []
 
 (startOnShiftWeek..12).each {
     def shiftCodes = properties.getProperty("shift.week.${it}").split(',')
-    assert 7 ==  shiftCodes.size()
+    assert 7 == shiftCodes.size()
     shifts.addAll(shiftCodes)
 }
 println "number of shifts: ${shifts.size()}, shifts:  ${shifts}"
@@ -72,7 +74,23 @@ def calendarId = properties.getProperty('calendarid')
 service = getCalendarService()
 
 calendarEvents.forEach() {
-    addEventToCalendar(calendarId, it.date as ZonedDateTime, it.summary as String)
+    try {
+        addEventToCalendar(calendarId, it.date as ZonedDateTime, it.summary as String)
+    } catch (GoogleJsonResponseException e) {
+        println e
+
+        if (retryAddingEvent(e)) {
+            sleep(3000)
+            addEventToCalendar(calendarId, it.date as ZonedDateTime, it.summary as String)
+        } else {
+            throw e
+        }
+    }
+}
+
+boolean retryAddingEvent(GoogleJsonResponseException e) {
+    def reason = e.getDetails().getErrors().get(0).getReason()
+    e.getStatusCode() == 403 && (reason == 'rateLimitExceeded' || reason == 'userRateLimitExceeded')
 }
 
 boolean dayIsWeekDay(LocalDate date) {

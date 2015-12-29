@@ -32,29 +32,40 @@ resourceAsStream('/calendar.properties').withStream {
     properties.load(it)
 }
 
+def startDate = LocalDate.parse('2016-01-04')
+assert MONDAY == startDate.dayOfWeek
+
+def shiftWeekStart = 6
+assert (1..12).contains(shiftWeekStart)
+
+def shifts = []
+
+(shiftWeekStart..12).each {
+    def shiftCodes = properties.getProperty("shift.week.${it}").split(',')
+    assert 7 ==  shiftCodes.size()
+    shifts.addAll(shiftCodes)
+}
+println "number of shifts: ${shifts.size()}, shifts:  ${shifts}"
+
+def eventJobText = properties.getProperty('event.job.text')
+def nightShiftsWeekDays = properties.getProperty('nightshifts.weekdays').split(',')
+def eventPickupText = properties.getProperty('event.pickup.text')
 def calendarEvents = []
 
-def workweekOnly = properties.getProperty('workweek.only').split(',')
-def weekendOnly = properties.getProperty('weekend.only').split(',')
-def eventJobText = properties.getProperty('event.job.text')
-def nightShifts = properties.getProperty('nightshifts').split(',')
-def eventPickupText = properties.getProperty('event.pickup.text')
+shifts.eachWithIndex { shiftCode, index ->
+    def summary = String.format(eventJobText, shiftCode, properties.getProperty("shift.hours.${shiftCode}"))
 
-resourceAsStream('/turnus.csv').splitEachLine(',') { fields ->
-    def date = LocalDate.parse(fields[0], DateTimeFormatter.ofPattern('dd.MM.yyyy'))
-    def shiftCode = fields[1]
+    def date = startDate.plusDays(index as long)
+    calendarEvents << [date: zonedDateTime(date, 8), summary: summary]
 
-    if (shiftCodeIsValidForDay(workweekOnly, weekendOnly, date, shiftCode)) {
-        def summary = String.format(eventJobText, shiftCode, properties.getProperty("shift.${shiftCode}.hours"))
-
-        calendarEvents << [date: createZonedDateTime(date, 8), summary: summary]
-
-        if (nightShiftOnWeekday(nightShifts, shiftCode, date)) {
-            calendarEvents << [date: createZonedDateTime(date, 15), summary: eventPickupText]
-        }
-    } else {
-        throw new Exception("Shift code '${shiftCode}' is not valid for day ${date} [$date.dayOfWeek]")
+    if (nightShiftsWeekDays.contains(shiftCode) && dayIsWeekDay(date)) {
+        calendarEvents << [date: zonedDateTime(date, 15), summary: eventPickupText]
     }
+}
+
+println "number of events ${calendarEvents.size()}, calendarEvents:"
+calendarEvents.each {
+    println it
 }
 
 def calendarId = properties.getProperty('calendarid')
@@ -64,34 +75,21 @@ calendarEvents.forEach() {
     addEventToCalendar(calendarId, it.date, it.summary)
 }
 
-private boolean shiftCodeIsValidForDay(String[] workweekOnly, String[] weekendOnly, LocalDate date, String shiftCode) {
-    boolean isWeekendDay = [SATURDAY, SUNDAY].contains(date.dayOfWeek)
-    boolean shiftCodeIsWeekendOnly = weekendOnly.contains(shiftCode)
-    boolean shiftCodeIsWorkWeekOnly = workweekOnly.contains(shiftCode)
-
-    (isWeekDay(date) && !shiftCodeIsWeekendOnly) || (isWeekendDay && !shiftCodeIsWorkWeekOnly)
-}
-
-private boolean nightShiftOnWeekday(String[] nightShifts, String shiftCode, LocalDate date) {
-    nightShifts.contains(shiftCode) && isWeekDay(date)
-}
-
-boolean isWeekDay(LocalDate date) {
+boolean dayIsWeekDay(LocalDate date) {
     [MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY].contains(date.dayOfWeek)
 }
 
-private ZonedDateTime createZonedDateTime(LocalDate date, Integer startHour) {
-    def zonedDateTime = ZonedDateTime.now()
+ZonedDateTime zonedDateTime(LocalDate date, Integer startHour) {
+    ZonedDateTime.now()
             .withYear(date.year)
             .withMonth(date.monthValue)
             .withDayOfMonth(date.dayOfMonth)
             .withHour(startHour)
             .withMinute(0)
-    zonedDateTime
 }
 
-def addEventToCalendar(String calendarId, ZonedDateTime zonedDateTime, String summary) {
-    println('Adding event to calendar')
+void addEventToCalendar(String calendarId, ZonedDateTime zonedDateTime, String summary) {
+    println 'Adding event to calendar'
 
     Event event = new Event()
             .setSummary(summary)
@@ -107,30 +105,30 @@ def addEventToCalendar(String calendarId, ZonedDateTime zonedDateTime, String su
     event.setReminders(reminders)
 
     event = service.events().insert(calendarId, event).execute()
-    println("Event created: ${event.getHtmlLink()}")
+    println "Event created: ${event.getHtmlLink()}"
 }
 
-private EventDateTime createEventDateTime(ZonedDateTime zonedDateTime) {
+EventDateTime createEventDateTime(ZonedDateTime zonedDateTime) {
     DateTime dateTime = new DateTime(zonedDateTime.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME))
 
     EventDateTime eventDateTime = new EventDateTime()
             .setDateTime(dateTime)
-            .setTimeZone("Europe/Oslo")
+            .setTimeZone('Europe/Oslo')
 
     eventDateTime
 }
 
-private InputStream resourceAsStream(String resource) {
+InputStream resourceAsStream(String resource) {
     CalendarUpdater.class.getResourceAsStream(resource)
 }
 
-private Calendar getCalendarService() {
+Calendar getCalendarService() {
     new Calendar.Builder(httpTransport(), jacksonFactory(), authorize())
             .setApplicationName('Google Calendar Updater')
             .build()
 }
 
-private Credential authorize() {
+Credential authorize() {
     // Load client secrets.
     InputStream inputStream = resourceAsStream('/client_secret.json')
     GoogleClientSecrets clientSecrets = GoogleClientSecrets.load(jacksonFactory(), new InputStreamReader(inputStream))
@@ -145,15 +143,15 @@ private Credential authorize() {
                     .setAccessType('offline')
                     .build()
     Credential credential = new AuthorizationCodeInstalledApp(flow, new LocalServerReceiver()).authorize('user')
-    println("Credentials saved to ${dataStoreDir.getAbsolutePath()}")
+    println "Credentials saved to ${dataStoreDir.getAbsolutePath()}"
 
     credential
 }
 
-private JacksonFactory jacksonFactory() {
+JacksonFactory jacksonFactory() {
     JacksonFactory.getDefaultInstance()
 }
 
-private HttpTransport httpTransport() {
+HttpTransport httpTransport() {
     GoogleNetHttpTransport.newTrustedTransport()
 }

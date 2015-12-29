@@ -72,7 +72,7 @@ def calendarId = properties.getProperty('calendarid')
 service = getCalendarService()
 
 calendarEvents.forEach() {
-    addEventToCalendar(calendarId, it.date, it.summary)
+    addEventToCalendar(calendarId, it.date as ZonedDateTime, it.summary as String)
 }
 
 boolean dayIsWeekDay(LocalDate date) {

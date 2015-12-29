@@ -32,15 +32,15 @@ resourceAsStream('/calendar.properties').withStream {
     properties.load(it)
 }
 
-def startDate = LocalDate.parse('2016-01-04')
+def startDate = LocalDate.parse(properties.getProperty('start.date'))
 assert MONDAY == startDate.dayOfWeek
 
-def shiftWeekStart = 6
-assert (1..12).contains(shiftWeekStart)
+def startOnShiftWeek = properties.getProperty('start.on.shift.week') as int
+assert (1..12).contains(startOnShiftWeek)
 
 def shifts = []
 
-(shiftWeekStart..12).each {
+(startOnShiftWeek..12).each {
     def shiftCodes = properties.getProperty("shift.week.${it}").split(',')
     assert 7 ==  shiftCodes.size()
     shifts.addAll(shiftCodes)

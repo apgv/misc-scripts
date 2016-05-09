@@ -19,6 +19,7 @@ import com.google.api.services.calendar.model.EventDateTime
 import java.time.LocalDate
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 
 import static java.time.DayOfWeek.*
 
@@ -103,7 +104,7 @@ ZonedDateTime zonedDateTime(LocalDate date, Integer startHour) {
             .withMonth(date.monthValue)
             .withDayOfMonth(date.dayOfMonth)
             .withHour(startHour)
-            .withMinute(0)
+            .truncatedTo(ChronoUnit.HOURS)
 }
 
 void addEventToCalendar(String calendarId, ZonedDateTime zonedDateTime, String summary) {
